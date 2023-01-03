@@ -29,22 +29,32 @@ public class OOPUnitCore {
             throw new IllegalArgumentException();
         }
 
-        
         // Gather all setUp functions from all the Classes in tree
         Object obj = testClass.getConstructor().newInstance();
-        List<String> methSetupNames = new LinkedList<>();
-        List<Method> methSetup = new LinkedList<>();
+
+
+        //Get OOPExceptionRule
+        Object expectedExeption = null;
+        for(Field F : testClass.getDeclaredFields()){
+            if(F.isAnnotationPresent(OOPExceptionRule.class)) {
+                expectedExeption = F.get(obj);
+            }
+        }
+
+        List<String> allMethodsNames = new LinkedList<>();
+        List<Method> allMethods = new LinkedList<>();
         
         for (Class<?> c = testClass; c != null; c = c.getSuperclass()) {
-            Arrays.stream(c.getDeclaredMethods()).filter(method -> method.isAnnotationPresent(OOPSetup.class))
+            Arrays.stream(c.getDeclaredMethods())
                     .forEach(method -> {
-                        if (!methSetupNames.contains(method.getName()) || Modifier.isStatic(method.getModifiers())) {
-                            methSetup.add(method);
-                            methSetupNames.add(method.getName());
+                        if (!allMethodsNames.contains(method.getName()) || Modifier.isStatic(method.getModifiers())) {
+                            allMethods.add(method);
+                            allMethodsNames.add(method.getName());
                         }
                     });
         }
 
+        List<Method> methSetup = allMethods.stream().filter(method -> method.isAnnotationPresent(OOPSetup.class)).toList();
         // Invoke each method on the Object
         methSetup.stream().sorted(Collections.reverseOrder()).forEach(method-> {
             method.setAccessible(true);
