@@ -4,10 +4,10 @@ import OOP.Provided.*;
 
 public class OOPResultImpl implements OOPResult {
     
-    private OOPTestResult result;
-    private String message;
+    OOPTestResult result;
+    String message;
 
-    OOPResultImpl(OOPTestResult res, String msg)
+    public OOPResultImpl(OOPTestResult res, String msg)
     {
         this.result = res;
         this.message = msg;
