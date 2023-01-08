@@ -58,5 +58,4 @@ public class ExampleTest {
             throw new Exception("error message");
         }
     }
-
 }

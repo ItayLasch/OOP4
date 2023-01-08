@@ -9,6 +9,7 @@ public class OOPExpectedExceptionImpl implements OOP.Provided.OOPExpectedExcepti
 
     private OOPExpectedExceptionImpl()
     {
+        expectedExcep = null;
         messages = new ArrayList<>();
     }
 
