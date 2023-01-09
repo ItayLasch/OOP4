@@ -101,37 +101,19 @@ public class OOPUnitCore {
         }
     }
 
-    private static OOPTestResult invokeMethod(Method method, Object obj, Object backup, String[] msg) {
-        method.setAccessible(true);
-        try {
-            backupObj(obj, backup);
-            method.invoke(obj);
-        } catch (Exception e) {
-            backupObj(backup, obj);
-            msg[0] = e.getCause().getClass().getName();
-            return OOPTestResult.ERROR;
-        }
-
-        return OOPTestResult.SUCCESS;
-    }
-
-    private static OOPTestResult invokeBeforeMethod(List<Method> Methods, Object obj, Object backup, String[] msg) {
-        ListIterator<?> it = Methods.listIterator(Methods.size());
-        while (it.hasPrevious()) {
-            Method method = (Method) it.previous();
-            if (invokeMethod(method, obj, backup, msg) == OOPTestResult.ERROR) {
-                return OOPTestResult.ERROR;
-            }
-        }
-        return OOPTestResult.SUCCESS;
-    }
-
-    private static OOPTestResult invokeAfterMethod(List<Method> Methods, Object obj, Object backup, String[] msg) {
+    private static OOPTestResult invokeBeforeAfterMethod(List<Method> Methods, Object obj, Object backup, String[] msg) {
         for (Method method : Methods) {
-            if (invokeMethod(method, obj, backup, msg) == OOPTestResult.ERROR) {
+            method.setAccessible(true);
+            try {
+                backupObj(obj, backup);
+                method.invoke(obj);
+            } catch (Exception e) {
+                backupObj(backup, obj);
+                msg[0] = e.getCause().getClass().getName();
                 return OOPTestResult.ERROR;
             }
         }
+
         return OOPTestResult.SUCCESS;
     }
 
@@ -150,12 +132,12 @@ public class OOPUnitCore {
         throw new OOPAssertionFailure();
     }
 
-    static public OOPTestSummary runClass(Class<?> testClass) {
+    static public OOPTestSummary runClass(Class<?> testClass) throws IllegalArgumentException {
 
         return runClass(testClass, "");
     }
 
-    static public OOPTestSummary runClass(Class<?> testClass, String tag) {
+    static public OOPTestSummary runClass(Class<?> testClass, String tag) throws  IllegalArgumentException{
         if (testClass == null || tag == null || !testClass.isAnnotationPresent(OOPTestClass.class)) {
             throw new IllegalArgumentException();
         }
@@ -193,18 +175,22 @@ public class OOPUnitCore {
         Map<String, OOPResult> results = new HashMap<>();
 
         // Gather all setUp functions from all the classes in inheritance tree
-        List<Method> methSetup = allMethods.stream().filter(method -> method.isAnnotationPresent(OOPSetup.class))
+        List<Method> methSetuptemp = allMethods.stream().filter(method -> method.isAnnotationPresent(OOPSetup.class))
                 .toList();
-        ListIterator<?> it = methSetup.listIterator(methSetup.size());
-        while (it.hasPrevious()) {
-            Method method = (Method) it.previous();
+        List<Method> methSetup = new LinkedList<>();
+        for(Method method: methSetuptemp)
+        {
+            methSetup.add(0, method);
+        }
+        methSetup.forEach(method ->
+        {
             method.setAccessible(true);
             try {
                 method.invoke(obj);
             } catch (Exception e) {
                 e.printStackTrace();
             }
-        }
+        });
 
         // Gather all Test functions from all the classes in inheritance tree
         List<Method> methTest = allMethods.stream()
@@ -220,12 +206,16 @@ public class OOPUnitCore {
         String[] message = new String[1];
         OOPTestResult result;
         for (Method method : methTest) {
-            List<Method> before = allMethods.stream().filter(m -> (m.isAnnotationPresent(OOPBefore.class) &&
+            List<Method> beforeTemp = allMethods.stream().filter(m -> (m.isAnnotationPresent(OOPBefore.class) &&
                     Arrays.asList(m.getAnnotation(OOPBefore.class).value()).contains(method.getName()))).toList();
             List<Method> after = allMethods.stream().filter(m -> (m.isAnnotationPresent(OOPAfter.class) &&
                     Arrays.asList(m.getAnnotation(OOPAfter.class).value()).contains(method.getName()))).toList();
-
-            result = invokeBeforeMethod(before, obj, backup, message);
+            List<Method> before = new LinkedList<>();
+            for (Method m : beforeTemp)
+            {
+                before.add(0, m);
+            }
+            result = invokeBeforeAfterMethod(before, obj, backup, message);
             if (result != OOPTestResult.SUCCESS) {
                 results.put(method.getName(), new OOPResultImpl(result, message[0]));
                 continue;
@@ -235,10 +225,9 @@ public class OOPUnitCore {
             result = invokeTestMethod(testClass, method, obj, message);
             results.put(method.getName(), new OOPResultImpl(result, message[0]));
 
-            result = invokeAfterMethod(after, obj, backup, message);
+            result = invokeBeforeAfterMethod(after, obj, backup, message);
             if (result != OOPTestResult.SUCCESS) {
                 results.put(method.getName(), new OOPResultImpl(result, message[0]));
-                continue;
             }
         }
 
