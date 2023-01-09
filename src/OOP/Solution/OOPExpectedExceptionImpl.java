@@ -4,22 +4,22 @@ import java.util.ArrayList;
 
 public class OOPExpectedExceptionImpl implements OOP.Provided.OOPExpectedException {
 
-    private Class<? extends Exception> expectedExcep;
+    private Class<? extends Exception> expectedExcept;
     private ArrayList<String> messages;
 
     private OOPExpectedExceptionImpl()
     {
-        expectedExcep = null;
+        expectedExcept = null;
         messages = new ArrayList<>();
     }
 
     public Class<? extends Exception> getExpectedException() {
-        return this.expectedExcep;
+        return this.expectedExcept;
     }
 
     public OOPExpectedExceptionImpl expect(Class<? extends Exception> expected)
     {
-        this.expectedExcep = expected;
+        this.expectedExcept = expected;
         return this;
     }
 
@@ -31,11 +31,11 @@ public class OOPExpectedExceptionImpl implements OOP.Provided.OOPExpectedExcepti
 
     public boolean assertExpected(Exception e)
     {
-        if (!this.expectedExcep.isInstance(e)) {
+        if (!this.expectedExcept.isInstance(e)) {
             return false;
         }
 
-        return this.messages.stream().anyMatch((msg) -> (!e.getMessage().contains(msg)));
+        return this.messages.stream().allMatch((msg) -> (e.getMessage().contains(msg)));
     }
     
     public static OOPExpectedExceptionImpl none()

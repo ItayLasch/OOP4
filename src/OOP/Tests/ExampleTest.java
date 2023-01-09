@@ -57,5 +57,7 @@ public class ExampleTest {
                     .expectMessage("rror messag");
             throw new Exception("error message");
         }
+
     }
+
 }
