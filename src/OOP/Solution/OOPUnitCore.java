@@ -2,6 +2,8 @@ package OOP.Solution;
 
 import java.lang.reflect.*;
 import java.util.*;
+import java.util.stream.Collectors;
+
 import OOP.Provided.*;
 import OOP.Provided.OOPResult.OOPTestResult;
 import OOP.Solution.OOPTestClass.OOPTestClassType;
@@ -117,7 +119,7 @@ public class OOPUnitCore {
         return OOPTestResult.SUCCESS;
     }
 
-    public static void assertEquals(Object expected, Object actual) {
+    public static void assertEquals(Object expected, Object actual) throws OOPAssertionFailure {
         if (expected == null && actual == null) {
             return;
         }
@@ -128,20 +130,21 @@ public class OOPUnitCore {
         throw new OOPAssertionFailure(expected, actual);
     }
 
-    static public void fail() {
+    static public void fail()  throws OOPAssertionFailure{
         throw new OOPAssertionFailure();
     }
 
     static public OOPTestSummary runClass(Class<?> testClass) throws IllegalArgumentException {
 
-        return runClass(testClass, "");
+        return runClass(testClass, null);
     }
 
     static public OOPTestSummary runClass(Class<?> testClass, String tag) throws  IllegalArgumentException{
-        if (testClass == null || tag == null || !testClass.isAnnotationPresent(OOPTestClass.class)) {
+        if (testClass == null || !testClass.isAnnotationPresent(OOPTestClass.class)) {
             throw new IllegalArgumentException();
         }
 
+        // Create Object and backup using a Constructor
         Object obj, backup;
         try {
             Constructor<?> constructor = testClass.getDeclaredConstructor();
@@ -155,16 +158,12 @@ public class OOPUnitCore {
         List<String> allMethodsNames = new LinkedList<>();
         List<Method> allMethods = new LinkedList<>();
 
-        // Gather all methods in inheritance tree
-        Arrays.stream(testClass.getDeclaredMethods()).forEach(method -> {
-            allMethodsNames.add(method.getName());
-            allMethods.add(method);
-        });
-
-        for (Class<?> c = testClass.getSuperclass(); c != null; c = c.getSuperclass()) {
+        for (Class<?> c = testClass; c != null; c = c.getSuperclass()) {
+            final Class<?> type = c;
             Arrays.stream(c.getDeclaredMethods())
                     .forEach(method -> {
-                        if (!allMethodsNames.contains(method.getName()) && !Modifier.isPrivate(method.getModifiers())) {
+                        if (!allMethodsNames.contains(method.getName()) &&
+                                ((type == testClass) || !Modifier.isPrivate(method.getModifiers()))) {
                             allMethods.add(method);
                             allMethodsNames.add(method.getName());
                         }
@@ -175,13 +174,10 @@ public class OOPUnitCore {
         Map<String, OOPResult> results = new HashMap<>();
 
         // Gather all setUp functions from all the classes in inheritance tree
-        List<Method> methSetuptemp = allMethods.stream().filter(method -> method.isAnnotationPresent(OOPSetup.class))
-                .toList();
-        List<Method> methSetup = new LinkedList<>();
-        for(Method method: methSetuptemp)
-        {
-            methSetup.add(0, method);
-        }
+        List<Method> methSetup = allMethods.stream().filter(method -> method.isAnnotationPresent(OOPSetup.class))
+                .collect(Collectors.toList());
+        Collections.reverse(methSetup);
+
         methSetup.forEach(method ->
         {
             method.setAccessible(true);
@@ -193,11 +189,14 @@ public class OOPUnitCore {
         });
 
         // Gather all Test functions from all the classes in inheritance tree
-        List<Method> methTest = allMethods.stream()
-                .filter(method -> (method.isAnnotationPresent(OOPTest.class)
-                        && method.getAnnotation(OOPTest.class).tag().contains(tag)))
-                .toList();
-
+        List<Method> methTest_t = allMethods.stream()
+                .filter(method -> (method.isAnnotationPresent(OOPTest.class)))
+                .collect(Collectors.toList());
+        List<Method> methTest = methTest_t;
+        if(tag != null)
+        {
+            methTest = methTest_t.stream().filter(method -> method.getAnnotation(OOPTest.class).tag().equals(tag)).collect(Collectors.toList());
+        }
         if (testClass.getAnnotation(OOPTestClass.class).value() == OOPTestClassType.ORDERED) {
             methTest = methTest.stream()
                     .sorted(Comparator.comparingInt((Method m) -> m.getAnnotation(OOPTest.class).order())).toList();
@@ -206,15 +205,12 @@ public class OOPUnitCore {
         String[] message = new String[1];
         OOPTestResult result;
         for (Method method : methTest) {
-            List<Method> beforeTemp = allMethods.stream().filter(m -> (m.isAnnotationPresent(OOPBefore.class) &&
-                    Arrays.asList(m.getAnnotation(OOPBefore.class).value()).contains(method.getName()))).toList();
+            List<Method> before = allMethods.stream().filter(m -> (m.isAnnotationPresent(OOPBefore.class) &&
+                    Arrays.asList(m.getAnnotation(OOPBefore.class).value()).contains(method.getName()))).collect(Collectors.toList());
+            Collections.reverse(before);
             List<Method> after = allMethods.stream().filter(m -> (m.isAnnotationPresent(OOPAfter.class) &&
                     Arrays.asList(m.getAnnotation(OOPAfter.class).value()).contains(method.getName()))).toList();
-            List<Method> before = new LinkedList<>();
-            for (Method m : beforeTemp)
-            {
-                before.add(0, m);
-            }
+
             result = invokeBeforeAfterMethod(before, obj, backup, message);
             if (result != OOPTestResult.SUCCESS) {
                 results.put(method.getName(), new OOPResultImpl(result, message[0]));
