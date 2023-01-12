@@ -9,7 +9,8 @@ import OOP.Provided.OOPResult.OOPTestResult;
 import OOP.Solution.OOPTestClass.OOPTestClassType;
 
 public class OOPUnitCore {
-    private static void backupObj(Object obj, Object other) {
+    private static Map<Field, Object> backupObj(Object obj) {
+        Map<Field, Object> backup_dict = new HashMap<>();
         Arrays.stream(obj.getClass().getDeclaredFields()).forEach(field -> {
             field.setAccessible(true);
             Object fieldObject;
@@ -24,17 +25,31 @@ public class OOPUnitCore {
                 if (fieldObject instanceof Cloneable) {
                     Method FieldClone = fieldClass.getDeclaredMethod("clone");
                     FieldClone.setAccessible(true);
-                    field.set(other, FieldClone.invoke(fieldObject));
+                    backup_dict.put(field, FieldClone.invoke(fieldObject));
+                    //field.set(other, FieldClone.invoke(fieldObject));
                 } else if (Arrays.stream(fieldClass.getConstructors())
                         .anyMatch(constructor -> (constructor.getParameterCount() == 1
                                 && constructor.getParameterTypes()[0] == fieldClass))) {
                     Constructor<?> cons = fieldClass.getConstructor(fieldClass);
-                    field.set(other, cons.newInstance(fieldObject));
+                    backup_dict.put(field, cons.newInstance(fieldObject));
+                    //field.set(other, cons.newInstance(fieldObject));
                 } else {
-                    field.set(other, field.get(obj));
+                    backup_dict.put(field, field.get(obj));
+                    //field.set(other, field.get(obj));
                 }
             } catch (Exception e) {
                 e.printStackTrace();
+            }
+        });
+        return backup_dict;
+    }
+    private static void restoreObject(Object obj, Map<Field, Object> backup_dict){
+        backup_dict.forEach((f, o) ->
+        {
+            try {
+                f.set(obj, o);
+            } catch (IllegalAccessException e) {
+                throw new RuntimeException(e);
             }
         });
     }
@@ -103,14 +118,14 @@ public class OOPUnitCore {
         }
     }
 
-    private static OOPTestResult invokeBeforeAfterMethod(List<Method> Methods, Object obj, Object backup, String[] msg) {
+    private static OOPTestResult invokeBeforeAfterMethod(List<Method> Methods, Object obj, String[] msg) {
         for (Method method : Methods) {
             method.setAccessible(true);
+            Map<Field, Object> backup_dict = backupObj(obj);
             try {
-                backupObj(obj, backup);
                 method.invoke(obj);
             } catch (Exception e) {
-                backupObj(backup, obj);
+                restoreObject(obj, backup_dict);
                 msg[0] = e.getCause().getClass().getName();
                 return OOPTestResult.ERROR;
             }
@@ -145,12 +160,11 @@ public class OOPUnitCore {
         }
 
         // Create Object and backup using a Constructor
-        Object obj, backup;
+        Object obj;
         try {
             Constructor<?> constructor = testClass.getDeclaredConstructor();
             constructor.setAccessible(true);
             obj = constructor.newInstance();
-            backup = constructor.newInstance();
         } catch (Exception e) {
             return null;
         }
@@ -211,7 +225,7 @@ public class OOPUnitCore {
             List<Method> after = allMethods.stream().filter(m -> (m.isAnnotationPresent(OOPAfter.class) &&
                     Arrays.asList(m.getAnnotation(OOPAfter.class).value()).contains(method.getName()))).toList();
 
-            result = invokeBeforeAfterMethod(before, obj, backup, message);
+            result = invokeBeforeAfterMethod(before, obj, message);
             if (result != OOPTestResult.SUCCESS) {
                 results.put(method.getName(), new OOPResultImpl(result, message[0]));
                 continue;
@@ -221,7 +235,7 @@ public class OOPUnitCore {
             result = invokeTestMethod(testClass, method, obj, message);
             results.put(method.getName(), new OOPResultImpl(result, message[0]));
 
-            result = invokeBeforeAfterMethod(after, obj, backup, message);
+            result = invokeBeforeAfterMethod(after, obj, message);
             if (result != OOPTestResult.SUCCESS) {
                 results.put(method.getName(), new OOPResultImpl(result, message[0]));
             }

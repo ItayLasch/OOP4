@@ -27,7 +27,10 @@ public class OOPResultImpl implements OOPResult {
             return false;
         }
         OOPResultImpl other = (OOPResultImpl) obj;
-
+        if(this.getMessage() == null && other.getMessage() == null)
+            return true;
+        else if(this.getMessage() == null || other.getMessage() == null)
+            return false;
         return (other.getResultType().equals(this.result) && other.getMessage().equals(this.message));
     }
 }
