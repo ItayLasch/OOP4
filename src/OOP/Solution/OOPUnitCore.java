@@ -18,24 +18,34 @@ public class OOPUnitCore {
             try {
                 fieldObject = field.get(obj);
                 fieldClass = fieldObject.getClass();
-                if (Modifier.isFinal(field.getModifiers()))
-                {
+                if (Modifier.isFinal(field.getModifiers())) {
                     return;
                 }
                 if (fieldObject instanceof Cloneable) {
-                    Method FieldClone = fieldClass.getDeclaredMethod("clone");
-                    FieldClone.setAccessible(true);
-                    backup_dict.put(field, FieldClone.invoke(fieldObject));
-                    //field.set(other, FieldClone.invoke(fieldObject));
+                    try {
+                        Method FieldClone = fieldClass.getDeclaredMethod("clone");
+                        FieldClone.setAccessible(true);
+                        backup_dict.put(field, FieldClone.invoke(fieldObject));
+                    } catch (NoSuchMethodException e) {
+                        Method FieldClone = fieldClass.getMethod("clone");
+                        FieldClone.setAccessible(true);
+                        backup_dict.put(field, FieldClone.invoke(fieldObject));
+                    }
                 } else if (Arrays.stream(fieldClass.getConstructors())
                         .anyMatch(constructor -> (constructor.getParameterCount() == 1
                                 && constructor.getParameterTypes()[0] == fieldClass))) {
-                    Constructor<?> cons = fieldClass.getConstructor(fieldClass);
-                    backup_dict.put(field, cons.newInstance(fieldObject));
-                    //field.set(other, cons.newInstance(fieldObject));
+                    try {
+                        Constructor<?> cons = fieldClass.getDeclaredConstructor(fieldClass);
+                        cons.setAccessible(true);
+                        backup_dict.put(field, cons.newInstance(fieldObject));
+                    } catch (NoSuchMethodException e) {
+                        Constructor<?> cons = fieldClass.getConstructor(fieldClass);
+                        cons.setAccessible(true);
+                        backup_dict.put(field, cons.newInstance(fieldObject));
+                    }
+
                 } else {
                     backup_dict.put(field, field.get(obj));
-                    //field.set(other, field.get(obj));
                 }
             } catch (Exception e) {
                 e.printStackTrace();
@@ -43,9 +53,9 @@ public class OOPUnitCore {
         });
         return backup_dict;
     }
-    private static void restoreObject(Object obj, Map<Field, Object> backup_dict){
-        backup_dict.forEach((f, o) ->
-        {
+
+    private static void restoreObject(Object obj, Map<Field, Object> backup_dict) {
+        backup_dict.forEach((f, o) -> {
             try {
                 f.set(obj, o);
             } catch (IllegalAccessException e) {
@@ -145,7 +155,7 @@ public class OOPUnitCore {
         throw new OOPAssertionFailure(expected, actual);
     }
 
-    static public void fail()  throws OOPAssertionFailure{
+    static public void fail() throws OOPAssertionFailure {
         throw new OOPAssertionFailure();
     }
 
@@ -154,7 +164,7 @@ public class OOPUnitCore {
         return runClass(testClass, null);
     }
 
-    static public OOPTestSummary runClass(Class<?> testClass, String tag) throws  IllegalArgumentException{
+    static public OOPTestSummary runClass(Class<?> testClass, String tag) throws IllegalArgumentException {
         if (testClass == null || !testClass.isAnnotationPresent(OOPTestClass.class)) {
             throw new IllegalArgumentException();
         }
@@ -192,8 +202,7 @@ public class OOPUnitCore {
                 .collect(Collectors.toList());
         Collections.reverse(methSetup);
 
-        methSetup.forEach(method ->
-        {
+        methSetup.forEach(method -> {
             method.setAccessible(true);
             try {
                 method.invoke(obj);
@@ -207,9 +216,9 @@ public class OOPUnitCore {
                 .filter(method -> (method.isAnnotationPresent(OOPTest.class)))
                 .collect(Collectors.toList());
         List<Method> methTest = methTest_t;
-        if(tag != null)
-        {
-            methTest = methTest_t.stream().filter(method -> method.getAnnotation(OOPTest.class).tag().equals(tag)).collect(Collectors.toList());
+        if (tag != null) {
+            methTest = methTest_t.stream().filter(method -> method.getAnnotation(OOPTest.class).tag().equals(tag))
+                    .collect(Collectors.toList());
         }
         if (testClass.getAnnotation(OOPTestClass.class).value() == OOPTestClassType.ORDERED) {
             methTest = methTest.stream()
@@ -220,7 +229,8 @@ public class OOPUnitCore {
         OOPTestResult result;
         for (Method method : methTest) {
             List<Method> before = allMethods.stream().filter(m -> (m.isAnnotationPresent(OOPBefore.class) &&
-                    Arrays.asList(m.getAnnotation(OOPBefore.class).value()).contains(method.getName()))).collect(Collectors.toList());
+                    Arrays.asList(m.getAnnotation(OOPBefore.class).value()).contains(method.getName())))
+                    .collect(Collectors.toList());
             Collections.reverse(before);
             List<Method> after = allMethods.stream().filter(m -> (m.isAnnotationPresent(OOPAfter.class) &&
                     Arrays.asList(m.getAnnotation(OOPAfter.class).value()).contains(method.getName()))).toList();

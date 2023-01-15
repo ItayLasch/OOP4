@@ -35,6 +35,15 @@ public class OOPExpectedExceptionImpl implements OOP.Provided.OOPExpectedExcepti
             return false;
         }
 
+        if(this.messages.isEmpty())
+        {
+            return true;
+        }
+        if(e.getMessage() == null)
+        {
+            return false;
+        }
+
         return this.messages.stream().allMatch((msg) -> (e.getMessage().contains(msg)));
     }
     
